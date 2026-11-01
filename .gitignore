@@ -9,3 +9,6 @@ __pycache__/
 .hypothesis/
 dist/
 benches/data/
+
+# Local notes
+DEPLOYMENT.md
