@@ -34,6 +34,7 @@ Homepage = "https://github.com/aziaya/piihush"
 Repository = "https://github.com/aziaya/piihush"
 Issues = "https://github.com/aziaya/piihush/issues"
 Changelog = "https://github.com/aziaya/piihush/blob/master/CHANGELOG.md"
+Funding = "https://github.com/sponsors/aziaya"
 
 [project.optional-dependencies]
 ner = ["huggingface-hub>=0.30", "onnxruntime>=1.19", "tokenizers>=0.20"]

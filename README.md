@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/aziaya/piihush/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/aziaya/piihush/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Sponsor](https://img.shields.io/badge/sponsor-aziaya-ea4aaa?logo=githubsponsors)](https://github.com/sponsors/aziaya)
 
 Fast PII and secret masking for RAG and LLM pipelines. piihush is a Rust extension
 for Python that removes sensitive data from your text before it reaches an external
@@ -45,6 +46,7 @@ Read [Limitations](#limitations) and [Accuracy](#accuracy) before you rely on it
 - [Performance](#performance)
 - [How it works](#how-it-works)
 - [Contributing](#contributing)
+- [Sponsor](#sponsor)
 - [License](#license)
 
 ## Install
@@ -515,6 +517,11 @@ skip the regex entirely when a required byte such as `@` is absent.
 Bug reports and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md),
 and report security issues as described in [SECURITY.md](SECURITY.md). Use only
 made-up data in tests, issues and pull requests.
+
+## Sponsor
+
+If piihush is useful to you, you can support its development through
+[GitHub Sponsors](https://github.com/sponsors/aziaya).
 
 ## License
 
