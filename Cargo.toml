@@ -1,6 +1,6 @@
 [package]
 name = "piihush"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "High-speed PII and secret masking for RAG and LLM pipelines"
 license = "MIT"

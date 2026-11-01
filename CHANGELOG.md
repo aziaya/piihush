@@ -2,7 +2,14 @@
 
 This project follows [Semantic Versioning](https://semver.org/).
 
-## 0.1.0 - Unreleased
+## 0.1.1 - Unreleased
+
+- `piihush[ner]` no longer needs `onnxruntime`, so it installs on every supported
+  platform and Python version. The model now runs on NumPy with identical results.
+  It is about twice as slow as before.
+- `OnnxRecognizer` is replaced by `BertRecognizer`.
+
+## 0.1.0 - 2026-11-01
 
 Initial release: detectors for email, phone, SSN, credit card, IBAN, IP address,
 API key, JWT, private key, ID number, password, date of birth, address, person and

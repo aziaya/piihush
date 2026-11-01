@@ -56,53 +56,138 @@ def _other_occurrences(found: list[Span], text: str, allow: set[str]) -> list[Sp
     ]
 
 
-class OnnxRecognizer:
-    """Finds people and places with a pinned ONNX token classification model."""
+def _erf(x):
+    """Vectorized error function (Abramowitz and Stegun 7.1.26), accurate to 1.5e-7."""
+    import numpy
+
+    t = 1.0 / (1.0 + 0.3275911 * numpy.abs(x))
+    poly = t * (
+        0.254829592
+        + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429)))
+    )
+    return numpy.sign(x) * (1.0 - poly * numpy.exp(-x * x))
+
+
+def _load_safetensors(path: str):
+    """Read a safetensors file as named float32 arrays."""
+    import json
+
+    import numpy
+
+    with open(path, "rb") as file:
+        header_size = int.from_bytes(file.read(8), "little")
+        header = json.loads(file.read(header_size))
+        data = file.read()
+    # Copied because tensors in the file aren't aligned, and NumPy skips its fast
+    # matrix routines for unaligned arrays.
+    return {
+        name: numpy.frombuffer(
+            data[info["data_offsets"][0] : info["data_offsets"][1]], dtype="<f4"
+        )
+        .reshape(info["shape"])
+        .astype(numpy.float32)
+        for name, info in header.items()
+        if name != "__metadata__"
+    }
+
+
+class _Bert:
+    """BERT token classification, computed with NumPy.
+
+    Written out by hand so the add-on needs no compiled inference runtime, which
+    is what lets it install on every platform and Python version piihush supports.
+    Inputs are single unpadded sequences, so no attention mask is needed.
+    """
+
+    def __init__(self, weights: dict, config: dict) -> None:
+        self._w = weights
+        self._heads = config["num_attention_heads"]
+        self._layers = config["num_hidden_layers"]
+
+    def _dense(self, prefix: str, x):
+        return x @ self._w[f"{prefix}.weight"].T + self._w[f"{prefix}.bias"]
+
+    def _norm(self, prefix: str, x):
+        import numpy
+
+        mean = x.mean(axis=-1, keepdims=True)
+        variance = ((x - mean) ** 2).mean(axis=-1, keepdims=True)
+        scaled = (x - mean) / numpy.sqrt(variance + 1e-12)
+        return scaled * self._w[f"{prefix}.weight"] + self._w[f"{prefix}.bias"]
+
+    def _attention(self, prefix: str, x):
+        import numpy
+
+        length, width = x.shape
+        size = width // self._heads
+
+        def split(name: str):
+            projected = self._dense(f"{prefix}.{name}", x)
+            return projected.reshape(length, self._heads, size).transpose(1, 0, 2)
+
+        query, key, value = split("query"), split("key"), split("value")
+        scores = query @ key.transpose(0, 2, 1) / numpy.sqrt(numpy.float32(size))
+        scores = scores - scores.max(axis=-1, keepdims=True)
+        probabilities = numpy.exp(scores)
+        probabilities /= probabilities.sum(axis=-1, keepdims=True)
+        return (probabilities @ value).transpose(1, 0, 2).reshape(length, width)
+
+    def logits(self, ids: list[int]):
+        import numpy
+
+        w = self._w
+        ids_array = numpy.asarray(ids)
+        x = (
+            w["bert.embeddings.word_embeddings.weight"][ids_array]
+            + w["bert.embeddings.position_embeddings.weight"][: len(ids)]
+            + w["bert.embeddings.token_type_embeddings.weight"][0]
+        )
+        x = self._norm("bert.embeddings.LayerNorm", x)
+        for index in range(self._layers):
+            layer = f"bert.encoder.layer.{index}"
+            attended = self._attention(f"{layer}.attention.self", x)
+            attended = self._dense(f"{layer}.attention.output.dense", attended)
+            x = self._norm(f"{layer}.attention.output.LayerNorm", x + attended)
+            hidden = self._dense(f"{layer}.intermediate.dense", x)
+            hidden = 0.5 * hidden * (1.0 + _erf(hidden * 0.70710678))  # exact GELU
+            hidden = self._dense(f"{layer}.output.dense", hidden)
+            x = self._norm(f"{layer}.output.LayerNorm", x + hidden)
+        return self._dense("classifier", x)
+
+
+class BertRecognizer:
+    """Finds people and places with a pinned BERT token classification model."""
 
     def __init__(self, repo: str = MODEL_REPO, revision: str = MODEL_REVISION) -> None:
         try:
             import json
 
-            import numpy
-            import onnxruntime
+            import numpy  # noqa: F401
             from huggingface_hub import hf_hub_download
             from tokenizers import Tokenizer
         except ImportError as error:
             raise ImportError(
-                "model-based detection needs extra packages: pip install piihush[ner]"
+                "model-based detection needs extra packages: pip install 'piihush[ner]'"
             ) from error
 
         def fetch(name: str) -> str:
-            return hf_hub_download(repo, f"onnx/{name}", revision=revision)
+            return hf_hub_download(repo, name, revision=revision)
 
-        self._numpy = numpy
-        self._session = onnxruntime.InferenceSession(
-            fetch("model.onnx"), providers=["CPUExecutionProvider"]
-        )
-        self._inputs = {i.name for i in self._session.get_inputs()}
-        self._tokenizer = Tokenizer.from_file(fetch("tokenizer.json"))
+        with open(fetch("config.json"), encoding="utf-8") as config_file:
+            config = json.load(config_file)
+        self._labels = {int(i): label for i, label in config["id2label"].items()}
+        self._model = _Bert(_load_safetensors(fetch("model.safetensors")), config)
+        self._tokenizer = Tokenizer.from_file(fetch("onnx/tokenizer.json"))
         self._tokenizer.enable_truncation(max_length=_MAX_TOKENS, stride=_STRIDE)
-        with open(fetch("config.json"), encoding="utf-8") as config:
-            id2label = json.load(config)["id2label"]
-        self._labels = {int(i): label for i, label in id2label.items()}
 
     def __call__(self, text: str) -> list[Span]:
-        numpy = self._numpy
         first = self._tokenizer.encode(text)
         spans: list[Span] = []
         for window in [first, *first.overflowing]:
-            ids = numpy.array([window.ids], dtype=numpy.int64)
-            feed = {
-                "input_ids": ids,
-                "attention_mask": numpy.array([window.attention_mask], dtype=numpy.int64),
-                "token_type_ids": numpy.zeros_like(ids),
-            }
-            logits = self._session.run(
-                None, {k: v for k, v in feed.items() if k in self._inputs}
-            )[0][0]
+            predictions = self._model.logits(window.ids).argmax(axis=-1).tolist()
             tokens = [
                 (_MODEL_LABELS.get(self._labels[token].partition("-")[2]), start, end)
-                for token, (start, end) in zip(logits.argmax(axis=-1).tolist(), window.offsets)
+                for token, (start, end) in zip(predictions, window.offsets)
             ]
             # Windows overlap, so each is decoded alone and `detect` merges them.
             spans += _decode(tokens, text)
@@ -113,7 +198,7 @@ class NerMasker:
     """A ``Masker`` that also masks what a recognizer finds.
 
     Takes the same arguments as ``Masker``. ``recognizer`` is any callable that
-    returns ``(entity, start, end)`` tuples and defaults to ``OnnxRecognizer``.
+    returns ``(entity, start, end)`` tuples and defaults to ``BertRecognizer``.
     This is far slower than ``Masker``, and sends nothing over the network apart
     from the first model download.
     """
@@ -135,7 +220,7 @@ class NerMasker:
             allow_list=allow_list,
             template=template,
         )
-        self._recognizer = recognizer if recognizer is not None else OnnxRecognizer()
+        self._recognizer = recognizer if recognizer is not None else BertRecognizer()
         self._enabled = None if entities is None else set(entities)
         self._allow = {value.lower() for value in allow_list or ()}
         self._template = template if template is not None else _DEFAULT_TEMPLATE
