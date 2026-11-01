@@ -80,6 +80,9 @@ Optional add-ons:
 | `pip install "piihush[ner]"` | [Name and place detection](#better-name-detection) | Everywhere piihush does |
 | `pip install "piihush[ner-fast]"` | The same, about 3 times faster | Where `onnxruntime` is available |
 
+`piihush[llm]` also adds [LLM detection](#llm-detection), for catching more PII at a
+much higher cost per record.
+
 Wheels cover Python 3.11+ on Linux (glibc and musl), macOS and Windows, on x86-64
 and ARM64. You don't need a Rust toolchain.
 
@@ -343,6 +346,7 @@ for text in chat.stream("Now make it shorter"):
 | DeepSeek | `deepseek` | `DEEPSEEK_API_KEY` |
 | Grok | `grok` | `XAI_API_KEY` |
 | Ollama | `ollama` | None |
+| Ollama Cloud | `ollama-cloud` | `OLLAMA_API_KEY` |
 | llama.cpp | `llamacpp` | None |
 
 Any other OpenAI-compatible service works through `base_url`:
@@ -360,9 +364,8 @@ chat = PrivateChat(base_url="http://localhost:1234/v1", model="my-model")
 - **Keep guards separate:** use one per conversation or user. A guard remembers what
   it masked, so sharing one could reveal one user's values to another.
 
-Testing covers `llamacpp` with a real model, and the rest with a simulated server. The
-cloud provider addresses come from each provider's documentation but haven't been
-called with real API keys yet.
+Tested with real models: llama.cpp and Ollama Cloud. The others use each provider's
+documented address and have only run against a simulated server.
 
 ## Concurrency
 
@@ -443,6 +446,33 @@ custom = NerMasker(recognizer=my_recognizer)
 custom.mask("Status of Project Falcon")
 # 'Status of [PROJECT_REDACTED]'
 ```
+
+## LLM detection
+
+`LlmRecognizer` asks an LLM to find PII that the rules miss. Use it with `NerMasker`,
+which keeps all the rules running alongside it. The model can be local or hosted.
+
+```python
+from piihush.llm import LlmRecognizer
+from piihush.ner import BertRecognizer, NerMasker, combine
+
+llm = LlmRecognizer("ollama", model="your-model-name")
+
+rules_and_llm = NerMasker(recognizer=llm)
+strongest = NerMasker(recognizer=combine(BertRecognizer(), llm))
+```
+
+Found values are labelled `PII`, so they become `[PII_REDACTED]`.
+
+**Before you use it:**
+
+- **The LLM sees your raw text.** Use a model or service you trust with that data.
+- **A document can talk it out of reporting.** In testing, one "ignore your
+  instructions" sentence stopped the LLM reporting anything. The rules and NER model
+  aren't affected, so you fall back to their results. Don't use an LLM on its own.
+- **It costs far more.** Expect seconds per record, plus any provider fees.
+- **It only adds masking.** A value counts only if it really appears in the text.
+  If a request fails, it raises `LLMError` instead of letting text through unchecked.
 
 ## API reference
 
@@ -597,23 +627,24 @@ Read these results with care:
 To reproduce these results, see the instructions in
 [`benches/accuracy.py`](benches/accuracy.py).
 
-### Why LLM detection isn't included
+### LLM detection results
 
-We tested using an LLM to find PII, with Qwen 2.5 1.5B running locally on 200 unused
-records from the same dataset ([`benches/llm_detection.py`](benches/llm_detection.py)):
+Measured with Qwen 2.5 1.5B running locally on 200 unused records from the same
+dataset ([`benches/llm_detection.py`](benches/llm_detection.py)). Other models will
+score differently.
 
 | Setup | PII masked | Ordinary words kept | Time per record |
 | --- | --- | --- | --- |
-| `Masker` | 43.4% | 98.7% | 0.1 ms |
-| `Masker` + LLM | 54.5% | 93.8% | 1.8 s |
-| `NerMasker` | 60.1% | 97.7% | About 55 ms |
-| `NerMasker` + LLM | 66.7% | 92.9% | About 1.9 s |
+| `Masker` | 41.7% | 99.1% | 0.1 ms |
+| `Masker` + LLM | 56.8% | 95.3% | 2.2 s |
+| `NerMasker` | 61.8% | 96.6% | About 55 ms |
+| `NerMasker` + LLM | 71.9% | 93.3% | About 2.2 s |
 
-The LLM helped, but `NerMasker` alone did better than `Masker` + LLM, and was far
-faster. The bigger problem is prompt injection: adding one "ignore your instructions"
-sentence to 50 records took the LLM from finding 59 values to finding 0. A cloud LLM
-would also receive the raw PII it's meant to protect. This is a small sample and a
-small model, so a larger model may score higher, but the injection risk remains.
+- **Best coverage:** `NerMasker` + LLM masked the most, at about 40 times the cost of
+  `NerMasker` alone, and it replaced more ordinary text.
+- **Prompt injection:** one injected sentence took the LLM from finding 40 values in
+  50 records to finding 0.
+- **Small sample:** with 200 records, treat small differences as noise.
 
 ## Performance
 
