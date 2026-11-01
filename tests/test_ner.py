@@ -88,7 +88,7 @@ def test_missing_packages_explain_the_extra(monkeypatch):
     real_import = builtins.__import__
 
     def fake_import(name, *args, **kwargs):
-        if name == "onnxruntime":
+        if name == "tokenizers":
             raise ImportError(name)
         return real_import(name, *args, **kwargs)
 

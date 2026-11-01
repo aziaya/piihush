@@ -100,9 +100,9 @@ masker.mask("Reach me at +44 20 7946 0958")
 | --- | --- | --- |
 | Install | `pip install piihush` | `pip install "piihush[ner]"` |
 | Best for | Structured PII and secrets at high volume | Free text containing names and places |
-| Time per short record | About 20 µs | About 110 ms |
-| Memory | About 16 MB | About 850 MB |
-| Download | None | 411 MB model on first use |
+| Time per short record | About 20 µs | About 220 ms |
+| Memory | About 16 MB | About 950 MB |
+| Download | None | 433 MB model on first use |
 | PII masked in [testing](#accuracy) | 48.6% | 69.7% |
 
 Start with `Masker` unless your text contains names you must protect. You can also
@@ -311,12 +311,14 @@ ner_masker.mask("Neslihan Kaya wrote from Berlin")
 finds a name, it masks that name everywhere in the same text.
 
 - **Model:** the first run downloads
-  [dslim/bert-base-NER](https://huggingface.co/dslim/bert-base-NER) (MIT, 411 MB),
+  [dslim/bert-base-NER](https://huggingface.co/dslim/bert-base-NER) (MIT, 433 MB),
   pinned to an exact revision and cached by Hugging Face.
 - **Privacy:** after that download, the model runs on your machine and your text
   never leaves it.
 - **Offline use:** once the model is cached, set `HF_HUB_OFFLINE=1`.
-- **Cost:** about 110 ms per short record and about 850 MB of memory.
+- **Engine:** the model runs on NumPy, so there is no compiled inference runtime to
+  install.
+- **Cost:** about 220 ms per short record and about 950 MB of memory.
 - **Other models:** pass any callable that returns `(entity, start, end)` tuples,
   where the offsets are Python string indices:
 
@@ -444,7 +446,7 @@ the output.
 
 | Tool | PII masked | Ordinary words kept | Time per record |
 | --- | --- | --- | --- |
-| `piihush.ner.NerMasker` | 69.7% | 96.6% | 113 ms |
+| `piihush.ner.NerMasker` | 69.7% | 96.6% | About 220 ms |
 | Presidio 2.2 (`en_core_web_lg`) | 64.8% | 94.8% | 15 ms |
 | `piihush.Masker` | 48.6% | 98.2% | About 20 µs |
 | scrubadub 2.0 | 13.8% | 98.3% | 1.2 ms |

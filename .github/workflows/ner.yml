@@ -1,0 +1,58 @@
+name: NER add-on
+
+on:
+  push:
+    paths: &paths
+      - python/piihush/ner.py
+      - tests/test_ner*.py
+      - pyproject.toml
+      - .github/workflows/ner.yml
+  pull_request:
+    paths: *paths
+
+permissions:
+  contents: read
+
+env:
+  PIIHUSH_TEST_MODEL: "1"
+
+jobs:
+  native:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+          - macos-latest
+          - macos-15-intel
+          - windows-latest
+          - windows-11-arm
+        python-version: ["3.11", "3.13", "3.15"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install ".[ner]" pytest hypothesis
+      - run: pytest tests/test_ner.py tests/test_ner_model.py
+
+  alpine:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm]
+        python-version: ["3.11", "3.15"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: |
+          docker run --rm -e PIIHUSH_TEST_MODEL -v "$PWD:/src" -w /src \
+            python:${{ matrix.python-version }}-alpine sh -euc '
+              apk add --no-cache curl gcc musl-dev
+              curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+              . "$HOME/.cargo/env"
+              pip install ".[ner]" pytest hypothesis
+              pytest tests/test_ner.py tests/test_ner_model.py
+            '
