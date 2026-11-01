@@ -4,13 +4,13 @@ build-backend = "maturin"
 
 [project]
 name = "piihush"
-description = "High-speed PII and secret masking for RAG and LLM pipelines, written in Rust"
+description = "High-speed PII and secret masking for RAG, AI agents and LLM applications, written in Rust"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "aziaya" }]
-keywords = ["pii", "anonymization", "redaction", "rag", "llm", "privacy", "rust"]
+keywords = ["pii", "anonymization", "redaction", "rag", "llm", "ai-agents", "privacy", "rust"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -38,6 +38,8 @@ Funding = "https://github.com/sponsors/aziaya"
 
 [project.optional-dependencies]
 ner = ["huggingface-hub>=0.30", "numpy>=1.26", "tokenizers>=0.20"]
+ner-fast = ["huggingface-hub>=0.30", "numpy>=1.26", "onnxruntime>=1.19", "tokenizers>=0.20"]
+llm = []
 
 [dependency-groups]
 dev = ["hypothesis>=6", "maturin>=1.16,<2", "pytest>=8"]
