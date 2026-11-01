@@ -1,8 +1,8 @@
 [package]
 name = "piihush"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
-description = "High-speed PII and secret masking for RAG and LLM pipelines"
+description = "High-speed PII and secret masking for AI applications"
 license = "MIT"
 readme = "README.md"
 publish = false

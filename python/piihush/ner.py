@@ -176,15 +176,42 @@ class BertRecognizer:
         with open(fetch("config.json"), encoding="utf-8") as config_file:
             config = json.load(config_file)
         self._labels = {int(i): label for i, label in config["id2label"].items()}
-        self._model = _Bert(_load_safetensors(fetch("model.safetensors")), config)
+        self._logits = self._onnx_logits(fetch) or _Bert(
+            _load_safetensors(fetch("model.safetensors")), config
+        ).logits
         self._tokenizer = Tokenizer.from_file(fetch("onnx/tokenizer.json"))
         self._tokenizer.enable_truncation(max_length=_MAX_TOKENS, stride=_STRIDE)
+
+    @staticmethod
+    def _onnx_logits(fetch: Callable[[str], str]) -> Callable | None:
+        """Use onnxruntime when it's installed: same output, about twice as fast."""
+        try:
+            import numpy
+            import onnxruntime
+        except ImportError:
+            return None
+
+        session = onnxruntime.InferenceSession(
+            fetch("onnx/model.onnx"), providers=["CPUExecutionProvider"]
+        )
+        names = {i.name for i in session.get_inputs()}
+
+        def logits(ids: list[int]):
+            input_ids = numpy.array([ids], dtype=numpy.int64)
+            feed = {
+                "input_ids": input_ids,
+                "attention_mask": numpy.ones_like(input_ids),
+                "token_type_ids": numpy.zeros_like(input_ids),
+            }
+            return session.run(None, {k: v for k, v in feed.items() if k in names})[0][0]
+
+        return logits
 
     def __call__(self, text: str) -> list[Span]:
         first = self._tokenizer.encode(text)
         spans: list[Span] = []
         for window in [first, *first.overflowing]:
-            predictions = self._model.logits(window.ids).argmax(axis=-1).tolist()
+            predictions = self._logits(window.ids).argmax(axis=-1).tolist()
             tokens = [
                 (_MODEL_LABELS.get(self._labels[token].partition("-")[2]), start, end)
                 for token, (start, end) in zip(predictions, window.offsets)

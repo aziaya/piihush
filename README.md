@@ -4,9 +4,9 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Sponsor](https://img.shields.io/badge/sponsor-aziaya-ea4aaa?logo=githubsponsors)](https://github.com/sponsors/aziaya)
 
-Fast PII and secret masking for RAG and LLM pipelines. piihush is a Rust extension
-for Python that removes sensitive data from your text before it reaches an external
-model provider.
+Fast PII and secret masking for AI applications. piihush is a Rust extension for
+Python that removes sensitive data from your text before it reaches an external
+model provider, in RAG pipelines, AI agents, chatbots, logs and data pipelines.
 
 ```python
 import piihush
@@ -31,12 +31,15 @@ Read [Limitations](#limitations) and [Accuracy](#accuracy) before you rely on it
 
 ## Contents
 
+- [Where to use it](#where-to-use-it)
 - [Install](#install)
 - [Quick start](#quick-start)
 - [Choosing a mode](#choosing-a-mode)
 - [What gets detected](#what-gets-detected)
 - [Configuring a Masker](#configuring-a-masker)
 - [Using piihush in a RAG pipeline](#using-piihush-in-a-rag-pipeline)
+- [Using piihush with AI agents](#using-piihush-with-ai-agents)
+- [Chat with any LLM privately](#chat-with-any-llm-privately)
 - [Concurrency](#concurrency)
 - [Better name detection](#better-name-detection)
 - [API reference](#api-reference)
@@ -49,11 +52,33 @@ Read [Limitations](#limitations) and [Accuracy](#accuracy) before you rely on it
 - [Sponsor](#sponsor)
 - [License](#license)
 
+## Where to use it
+
+| Use case | What piihush protects |
+| --- | --- |
+| RAG pipelines | Documents, chunks and questions before embedding or generation |
+| AI agents | Tool results, memory and retrieved data before they reach the model |
+| Chatbots and support assistants | Customer messages, with real values restored in the reply |
+| LLM observability | Prompts and replies before they reach logs or tracing tools |
+| Application logs | Emails, tokens and keys before logs are stored or shipped |
+| Training data | Datasets before fine-tuning, labelling or sharing with vendors |
+| Data pipelines and analytics | Free-text fields in ETL jobs and warehouses |
+| Document processing | Text extracted from tickets, emails, contracts and PDFs |
+| Developer tools | Code, configs and stack traces before they reach an AI assistant |
+
 ## Install
 
 ```sh
 pip install piihush
 ```
+
+Optional add-ons:
+
+| Install | Adds | Works on |
+| --- | --- | --- |
+| `pip install "piihush[llm]"` | [Private chat](#chat-with-any-llm-privately) with any LLM provider. Needs no extra packages | Everywhere piihush does |
+| `pip install "piihush[ner]"` | [Name and place detection](#better-name-detection) | Everywhere piihush does |
+| `pip install "piihush[ner-fast]"` | The same, about 3 times faster | Where `onnxruntime` is available |
 
 Wheels cover Python 3.11+ on Linux (glibc and musl), macOS and Windows, on x86-64
 and ARM64. You don't need a Rust toolchain.
@@ -100,7 +125,7 @@ masker.mask("Reach me at +44 20 7946 0958")
 | --- | --- | --- |
 | Install | `pip install piihush` | `pip install "piihush[ner]"` |
 | Best for | Structured PII and secrets at high volume | Free text containing names and places |
-| Time per short record | About 20 µs | About 220 ms |
+| Time per short record | About 20 µs | About 160 ms, or 55 ms with `ner-fast` |
 | Memory | About 16 MB | About 950 MB |
 | Download | None | 433 MB model on first use |
 | PII masked in [testing](#accuracy) | 48.6% | 69.7% |
@@ -254,6 +279,91 @@ safe_documents = [
 
 Metadata isn't masked in this example. If yours contains PII, mask it too.
 
+## Using piihush with AI agents
+
+An agent passes far more data to its model than the user typed: tool results,
+database rows, search hits, files and memory. Mask that data before it enters the
+agent's context.
+
+```python
+def lookup_customer(customer_id):
+    return "Customer: Jane Doe, jane@example.com, Card 4111 1111 1111 1111"
+
+def safe_tool(tool, *args):
+    return masker.mask(tool(*args))
+
+safe_tool(lookup_customer, 42)
+# 'Customer: [PERSON_REDACTED], [EMAIL_REDACTED], Card [CREDIT_CARD_REDACTED]'
+```
+
+When the agent must act on a real value, such as sending an email, use a
+[`PrivacyGuard`](#chat-with-any-llm-privately). The model works with `[EMAIL_1]`, and
+your code restores the real value at the moment a tool runs:
+
+```python
+from piihush.llm import PrivacyGuard
+
+guard = PrivacyGuard()
+context = guard.mask("Reply to jane@example.com")  # goes to the model
+tool_argument = "[EMAIL_1]"                        # the model's tool call
+guard.restore(tool_argument)
+# 'jane@example.com'
+```
+
+Treat tool arguments from a model as untrusted. A malicious document can try to steer
+an agent into using a restored value somewhere it shouldn't, so limit what each tool
+can do.
+
+## Chat with any LLM privately
+
+`PrivateChat` masks your message, sends it to a provider, and restores the real values
+in the reply. The provider only ever sees tokens such as `[EMAIL_1]`.
+
+```sh
+pip install "piihush[llm]"
+```
+
+```python
+from piihush.llm import PrivateChat
+
+chat = PrivateChat("anthropic", model="your-model-name")  # reads ANTHROPIC_API_KEY
+reply = chat.send("Write a reminder to email jane@example.com")
+# The provider receives: Write a reminder to email [EMAIL_1]
+# You receive: a reply containing jane@example.com
+
+for text in chat.stream("Now make it shorter"):
+    print(text, end="")
+```
+
+| Provider | Name | API key variable |
+| --- | --- | --- |
+| OpenAI | `openai` | `OPENAI_API_KEY` |
+| Claude | `anthropic` | `ANTHROPIC_API_KEY` |
+| Gemini | `gemini` | `GEMINI_API_KEY` |
+| DeepSeek | `deepseek` | `DEEPSEEK_API_KEY` |
+| Grok | `grok` | `XAI_API_KEY` |
+| Ollama | `ollama` | None |
+| llama.cpp | `llamacpp` | None |
+
+Any other OpenAI-compatible service works through `base_url`:
+
+```python
+chat = PrivateChat(base_url="http://localhost:1234/v1", model="my-model")
+```
+
+- **Options:** extra arguments go to the provider, as in
+  `chat.send(prompt, temperature=0, max_tokens=200)`.
+- **Better detection:** pass a guard, as in
+  `PrivateChat(..., guard=PrivacyGuard(NerMasker()))`.
+- **Your own client:** use `guard.mask` and `guard.restore` around any SDK, and
+  `guard.restore_stream` for streaming.
+- **Keep guards separate:** use one per conversation or user. A guard remembers what
+  it masked, so sharing one could reveal one user's values to another.
+
+Testing covers `llamacpp` with a real model, and the rest with a simulated server. The
+cloud provider addresses come from each provider's documentation but haven't been
+called with real API keys yet.
+
 ## Concurrency
 
 ### Threads
@@ -316,9 +426,11 @@ finds a name, it masks that name everywhere in the same text.
 - **Privacy:** after that download, the model runs on your machine and your text
   never leaves it.
 - **Offline use:** once the model is cached, set `HF_HUB_OFFLINE=1`.
-- **Engine:** the model runs on NumPy, so there is no compiled inference runtime to
-  install.
-- **Cost:** about 220 ms per short record and about 950 MB of memory.
+- **Speed:** the model runs on NumPy, about 160 ms per short record, so it installs
+  everywhere. With `pip install "piihush[ner-fast]"` it uses `onnxruntime` instead,
+  at about 55 ms with identical results. `onnxruntime` isn't available on every
+  platform.
+- **Memory:** about 950 MB.
 - **Other models:** pass any callable that returns `(entity, start, end)` tuples,
   where the offsets are Python string indices:
 
@@ -432,7 +544,8 @@ it doesn't by itself satisfy GDPR, HIPAA or any other regulation.
 - **Obfuscated text isn't detected,** such as `jane at example dot com` or full-width
   digits. Apply `unicodedata.normalize("NFKC", text)` first if your input may contain
   those.
-- **Masking is one-way.** Original values can't be restored from the output.
+- **`mask` is one-way.** Original values can't be restored from its output. Use
+  [`PrivacyGuard`](#chat-with-any-llm-privately) when you need them back.
 - **English is the tested language.** Other languages haven't been measured, and the
   model and most labels are English.
 
@@ -446,7 +559,7 @@ the output.
 
 | Tool | PII masked | Ordinary words kept | Time per record |
 | --- | --- | --- | --- |
-| `piihush.ner.NerMasker` | 69.7% | 96.6% | About 220 ms |
+| `piihush.ner.NerMasker` | 69.7% | 96.6% | About 160 ms (55 ms with `ner-fast`) |
 | Presidio 2.2 (`en_core_web_lg`) | 64.8% | 94.8% | 15 ms |
 | `piihush.Masker` | 48.6% | 98.2% | About 20 µs |
 | scrubadub 2.0 | 13.8% | 98.3% | 1.2 ms |
@@ -483,6 +596,24 @@ Read these results with care:
 
 To reproduce these results, see the instructions in
 [`benches/accuracy.py`](benches/accuracy.py).
+
+### Why LLM detection isn't included
+
+We tested using an LLM to find PII, with Qwen 2.5 1.5B running locally on 200 unused
+records from the same dataset ([`benches/llm_detection.py`](benches/llm_detection.py)):
+
+| Setup | PII masked | Ordinary words kept | Time per record |
+| --- | --- | --- | --- |
+| `Masker` | 43.4% | 98.7% | 0.1 ms |
+| `Masker` + LLM | 54.5% | 93.8% | 1.8 s |
+| `NerMasker` | 60.1% | 97.7% | About 55 ms |
+| `NerMasker` + LLM | 66.7% | 92.9% | About 1.9 s |
+
+The LLM helped, but `NerMasker` alone did better than `Masker` + LLM, and was far
+faster. The bigger problem is prompt injection: adding one "ignore your instructions"
+sentence to 50 records took the LLM from finding 59 values to finding 0. A cloud LLM
+would also receive the raw PII it's meant to protect. This is a small sample and a
+small model, so a larger model may score higher, but the injection risk remains.
 
 ## Performance
 

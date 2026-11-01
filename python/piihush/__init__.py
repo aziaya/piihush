@@ -1,4 +1,4 @@
-"""High-speed PII and secret masking for RAG and LLM pipelines."""
+"""High-speed PII and secret masking for AI applications."""
 
 from collections.abc import Iterable
 from functools import lru_cache
