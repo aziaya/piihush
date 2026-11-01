@@ -1,0 +1,29 @@
+[package]
+name = "piihush"
+version = "0.1.0"
+edition = "2024"
+description = "High-speed PII and secret masking for RAG and LLM pipelines"
+license = "MIT"
+readme = "README.md"
+publish = false
+
+[lib]
+name = "piihush"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# The engine is plain Rust. Only the wheel build enables the bindings, so
+# `cargo test` works without a Python interpreter.
+python = ["dep:pyo3"]
+
+[dependencies]
+aho-corasick = "1.1"
+memchr = "2.8"
+pyo3 = { version = "0.30", features = ["abi3-py311"], optional = true }
+regex = "1.13"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true

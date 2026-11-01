@@ -1,0 +1,11 @@
+/target
+.venv/
+__pycache__/
+*.py[cod]
+*.so
+*.dylib
+*.pyd
+.pytest_cache/
+.hypothesis/
+dist/
+benches/data/
