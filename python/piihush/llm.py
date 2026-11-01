@@ -3,12 +3,14 @@
 ``PrivacyGuard`` swaps values for numbered tokens such as ``[EMAIL_1]`` and puts them
 back in the reply. ``PrivateChat`` does that around a chat with any provider that has
 an OpenAI-compatible API. ``LlmRecognizer`` asks an LLM to find PII, for ``NerMasker``.
-Everything here uses only the standard library.
+It needs nothing beyond the standard library, plus ``certifi`` where Python has no
+certificates of its own, which ``piihush[llm]`` installs.
 """
 
 import json
 import os
 import re
+import ssl
 import threading
 import urllib.error
 import urllib.request
@@ -39,6 +41,21 @@ PROVIDERS = {
     "ollama-cloud": ("https://ollama.com/v1", "OLLAMA_API_KEY"),
     "llamacpp": ("http://localhost:8080/v1", None),
 }
+
+
+def _ssl_context() -> ssl.SSLContext:
+    """Trust the system's certificates plus certifi's, when it's installed.
+
+    Python from python.org on macOS ships with no certificates, so HTTPS fails there
+    without certifi. The system's stay trusted for networks with a private authority.
+    """
+    context = ssl.create_default_context()
+    try:
+        import certifi
+    except ImportError:
+        return context
+    context.load_verify_locations(cafile=certifi.where())
+    return context
 
 
 class LLMError(RuntimeError):
@@ -136,6 +153,7 @@ class _Client:
             raise ValueError(f"set {key_variable} or pass api_key")
         self._model = model
         self._timeout = timeout
+        self._context = _ssl_context()
 
     def open(self, messages: list[dict[str, str]], options: dict, stream: bool):
         body = {"model": self._model, "messages": messages, "stream": stream, **options}
@@ -146,12 +164,15 @@ class _Client:
             self._url, data=json.dumps(body).encode(), headers=headers, method="POST"
         )
         try:
-            return urllib.request.urlopen(request, timeout=self._timeout)
+            return urllib.request.urlopen(request, timeout=self._timeout, context=self._context)
         except urllib.error.HTTPError as error:
             detail = error.read(500).decode("utf-8", "replace")
             raise LLMError(f"provider returned {error.code}: {detail}") from error
         except OSError as error:
-            raise LLMError(f"could not reach {self._url}: {error}") from error
+            hint = ""
+            if isinstance(getattr(error, "reason", None), ssl.SSLCertVerificationError):
+                hint = " (Python has no trusted certificates: pip install 'piihush[llm]')"
+            raise LLMError(f"could not reach {self._url}: {error}{hint}") from error
 
     def complete(self, messages: list[dict[str, str]], options: dict) -> str:
         try:
