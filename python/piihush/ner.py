@@ -221,6 +221,15 @@ class BertRecognizer:
         return spans
 
 
+def combine(*recognizers: Recognizer) -> Recognizer:
+    """Run several recognizers and keep every hit, for ``NerMasker(recognizer=...)``."""
+
+    def recognize(text: str) -> list[Span]:
+        return [span for recognizer in recognizers for span in recognizer(text)]
+
+    return recognize
+
+
 class NerMasker:
     """A ``Masker`` that also masks what a recognizer finds.
 

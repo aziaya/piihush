@@ -2,11 +2,13 @@
 
 This project follows [Semantic Versioning](https://semver.org/).
 
-## 0.2.0 - Unreleased
+## 0.2.0 - 2026-11-01
 
 - Add `piihush.llm`: `PrivacyGuard` masks text reversibly, and `PrivateChat` talks to
   OpenAI, Claude, Gemini, DeepSeek, Grok, Ollama, llama.cpp or any OpenAI-compatible
   provider without sending them detected PII. It needs no extra packages.
+- Add `LlmRecognizer`, which uses any LLM to find PII with `NerMasker`, and `combine`
+  to run several recognizers together.
 - `NerMasker` uses `onnxruntime` when it's installed, about 3 times faster with
   identical results. Install it with `piihush[ner-fast]`.
 

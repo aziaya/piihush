@@ -4,7 +4,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
-from piihush.llm import PROVIDERS, LLMError, PrivacyGuard, PrivateChat
+from piihush.llm import PROVIDERS, LLMError, LlmRecognizer, PrivacyGuard, PrivateChat
+from piihush.ner import NerMasker, combine
 
 EMAIL = "jane@example.com"
 PHONE = "555-123-4567"
@@ -185,3 +186,43 @@ def test_every_provider_is_configured(provider, monkeypatch):
 def test_bad_arguments_raise(kwargs):
     with pytest.raises(ValueError):
         PrivateChat(**kwargs)
+
+
+def test_recognizer_returns_real_occurrences_only(server):
+    server.pieces = ['["Neslihan", "Invented Name", "ab"]']
+    recognizer = LlmRecognizer(base_url=server.url, model="m")
+    text = "Neslihan met Neslihan"
+    assert sorted(recognizer(text)) == [("PII", 0, 8), ("PII", 13, 21)]
+
+
+def test_recognizer_tolerates_text_around_the_list(server):
+    server.pieces = ['Sure! Here you go: ["Preston"] Hope that helps.']
+    recognizer = LlmRecognizer(base_url=server.url, model="m")
+    assert recognizer("From Preston") == [("PII", 5, 12)]
+
+
+def test_recognizer_only_adds_to_the_rules(server):
+    server.pieces = ["[]"]
+    masker = NerMasker(recognizer=LlmRecognizer(base_url=server.url, model="m"))
+    assert masker.mask("Neslihan a@b.io") == "Neslihan [EMAIL_REDACTED]"
+
+
+def test_recognizer_masks_through_ner_masker(server):
+    server.pieces = ['["Neslihan"]']
+    masker = NerMasker(recognizer=LlmRecognizer(base_url=server.url, model="m"))
+    assert masker.mask("Neslihan a@b.io") == "[PII_REDACTED] [EMAIL_REDACTED]"
+
+
+def test_recognizer_failure_raises_instead_of_passing_text_through(server):
+    server.status = 500
+    masker = NerMasker(recognizer=LlmRecognizer(base_url=server.url, model="m"))
+    with pytest.raises(LLMError):
+        masker.mask("Neslihan a@b.io")
+
+
+def test_combine_keeps_hits_from_every_recognizer():
+    first = lambda text: [("PERSON", 0, 3)]
+    second = lambda text: [("PII", 4, 7)]
+    assert NerMasker(recognizer=combine(first, second)).mask("Ann Lee") == (
+        "[PERSON_REDACTED] [PII_REDACTED]"
+    )
