@@ -2,7 +2,7 @@
 
 This project follows [Semantic Versioning](https://semver.org/).
 
-## 0.1.1 - Unreleased
+## 0.1.1 - 2026-11-01
 
 - `piihush[ner]` no longer needs `onnxruntime`, so it installs on every supported
   platform and Python version. The model now runs on NumPy with identical results.
