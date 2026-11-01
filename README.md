@@ -76,7 +76,7 @@ Optional add-ons:
 
 | Install | Adds | Works on |
 | --- | --- | --- |
-| `pip install "piihush[llm]"` | [Private chat](#chat-with-any-llm-privately) with any LLM provider. Needs no extra packages | Everywhere piihush does |
+| `pip install "piihush[llm]"` | [Private chat](#chat-with-any-llm-privately) with any LLM provider | Everywhere piihush does |
 | `pip install "piihush[ner]"` | [Name and place detection](#better-name-detection) | Everywhere piihush does |
 | `pip install "piihush[ner-fast]"` | The same, about 3 times faster | Where `onnxruntime` is available |
 
@@ -553,6 +553,10 @@ want every 16-digit number masked.
 **`ValueError: invalid pattern`.** Rust regex has no lookaround or backreferences.
 
 **`ImportError` from `NerMasker`.** Run `pip install "piihush[ner]"`.
+
+**`CERTIFICATE_VERIFY_FAILED` from `PrivateChat`.** Python has no trusted certificates,
+which is common with the python.org installer on macOS. Run
+`pip install "piihush[llm]"`.
 
 ## Limitations
 

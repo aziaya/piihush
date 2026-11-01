@@ -2,6 +2,12 @@
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## 0.2.1 - 2026-11-01
+
+- Fix `CERTIFICATE_VERIFY_FAILED` from `PrivateChat` and `LlmRecognizer` on Python
+  from python.org. `piihush[llm]` now installs `certifi`, and the system's
+  certificates stay trusted too.
+
 ## 0.2.0 - 2026-11-01
 
 - Add `piihush.llm`: `PrivacyGuard` masks text reversibly, and `PrivateChat` talks to

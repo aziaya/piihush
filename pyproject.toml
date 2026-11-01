@@ -39,10 +39,10 @@ Funding = "https://github.com/sponsors/aziaya"
 [project.optional-dependencies]
 ner = ["huggingface-hub>=0.30", "numpy>=1.26", "tokenizers>=0.20"]
 ner-fast = ["huggingface-hub>=0.30", "numpy>=1.26", "onnxruntime>=1.19", "tokenizers>=0.20"]
-llm = []
+llm = ["certifi>=2024.2.2"]
 
 [dependency-groups]
-dev = ["hypothesis>=6", "maturin>=1.16,<2", "pytest>=8"]
+dev = ["certifi>=2024.2.2", "hypothesis>=6", "maturin>=1.16,<2", "pytest>=8"]
 
 [tool.maturin]
 python-source = "python"

@@ -226,3 +226,25 @@ def test_combine_keeps_hits_from_every_recognizer():
     assert NerMasker(recognizer=combine(first, second)).mask("Ann Lee") == (
         "[PERSON_REDACTED] [PII_REDACTED]"
     )
+
+
+def test_ssl_context_keeps_verification_on():
+    import ssl
+
+    from piihush.llm import _ssl_context
+
+    context = _ssl_context()
+    assert context.verify_mode == ssl.CERT_REQUIRED and context.check_hostname
+
+
+def test_certificate_failure_explains_the_fix(monkeypatch):
+    import ssl
+    import urllib.error
+    import urllib.request
+
+    def fail(*args, **kwargs):
+        raise urllib.error.URLError(ssl.SSLCertVerificationError("bad"))
+
+    monkeypatch.setattr(urllib.request, "urlopen", fail)
+    with pytest.raises(LLMError, match=r"piihush\[llm\]"):
+        PrivateChat(base_url="https://example.invalid/v1", model="m").send("hi")
