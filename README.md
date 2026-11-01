@@ -364,8 +364,8 @@ chat = PrivateChat(base_url="http://localhost:1234/v1", model="my-model")
 - **Keep guards separate:** use one per conversation or user. A guard remembers what
   it masked, so sharing one could reveal one user's values to another.
 
-Tested with real models: llama.cpp and Ollama Cloud. The others use each provider's
-documented address and have only run against a simulated server.
+Tested with real models: OpenAI, Ollama Cloud and llama.cpp. The others use each
+provider's documented address and have only run against a simulated server.
 
 ## Concurrency
 
