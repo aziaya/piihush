@@ -3,6 +3,7 @@
 [![CI](https://github.com/aziaya/piihush/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/aziaya/piihush/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Sponsor](https://img.shields.io/badge/sponsor-aziaya-ea4aaa?logo=githubsponsors)](https://github.com/sponsors/aziaya)
+[![GitHub stars](https://img.shields.io/github/stars/aziaya/piihush?style=social)](https://github.com/aziaya/piihush/stargazers)
 
 Fast PII and secret masking for AI applications. piihush is a Rust extension for
 Python that removes sensitive data from your text before it reaches an external
@@ -29,6 +30,9 @@ piihush.mask("Call 555-123-4567 or email jane@example.com")
 piihush reduces what reaches a model provider, but it does not catch everything.
 Read [Limitations](#limitations) and [Accuracy](#accuracy) before you rely on it.
 
+⭐ **Find piihush useful? [Star it on GitHub](https://github.com/aziaya/piihush)** to
+help others discover it.
+
 ## Contents
 
 - [Where to use it](#where-to-use-it)
@@ -49,7 +53,7 @@ Read [Limitations](#limitations) and [Accuracy](#accuracy) before you rely on it
 - [Performance](#performance)
 - [How it works](#how-it-works)
 - [Contributing](#contributing)
-- [Sponsor](#sponsor)
+- [Support piihush](#support-piihush)
 - [License](#license)
 
 ## Where to use it
@@ -686,10 +690,15 @@ Bug reports and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md
 and report security issues as described in [SECURITY.md](SECURITY.md). Use only
 made-up data in tests, issues and pull requests.
 
-## Sponsor
+## Support piihush
 
-If piihush is useful to you, you can support its development through
-[GitHub Sponsors](https://github.com/sponsors/aziaya).
+If piihush is useful to you, here's how you can help:
+
+- ⭐ [Star the repository](https://github.com/aziaya/piihush) so more developers find it.
+- 🍴 [Fork it](https://github.com/aziaya/piihush/fork) and send a pull request.
+- 🐛 [Report a bug or request a feature](https://github.com/aziaya/piihush/issues/new/choose).
+- 📣 Share it with anyone building RAG pipelines, AI agents or LLM applications.
+- 💖 [Sponsor its development](https://github.com/sponsors/aziaya).
 
 ## License
 
