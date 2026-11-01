@@ -1,5 +1,17 @@
 # Contributing
 
+## Workflow
+
+`master` is protected, so every change goes through a pull request, including the
+maintainer's.
+
+1. Fork the repository and create a branch from `master`.
+2. Make your change, with tests.
+3. Open a pull request and fill in the template.
+4. Once CI passes and a code owner approves, the pull request is squash-merged.
+
+## Setup
+
 You need Rust (stable) and [uv](https://docs.astral.sh/uv/).
 
 ```sh
@@ -24,7 +36,8 @@ Before opening a pull request, run `cargo fmt` and
 
 ## Releasing
 
-Update the version in `Cargo.toml` and the changelog, then push a `vX.Y.Z` tag.
+Update the version in `Cargo.toml` and the changelog in a pull request. After it
+merges, push a `vX.Y.Z` tag from `master`.
 The release workflow builds the wheels and publishes them to PyPI.
 
 Never use real personal data in tests, issues or pull requests.
